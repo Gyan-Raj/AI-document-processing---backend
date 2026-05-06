@@ -5,9 +5,11 @@ from services.contract_service import (
     get_contract_path,
 )
 from services.config_service import add_config_path, delete_config_path
-from dao.risk_summary_path_dao import get_risk_summary_path_by_doc_id_dao
-from dao.contract_path_dao import get_contract_path_by_doc_id_dao
-from dao.config_path_dao import get_config_path_by_doc_id_dao
+from services.embedding_and_chunks_service import embed_and_store_chunks
+from dao.risk_summary_dao import get_risk_summary_path_by_doc_id_dao
+from dao.contract_dao import get_contract_by_doc_id_dao
+from dao.config_dao import get_config_path_by_doc_id_dao
+from dao.contract_dao import update_contract_embedding_status_dao
 import uuid
 from db.connection import AsyncSessionLocal
 from fastapi import HTTPException
@@ -15,7 +17,9 @@ from config.constants import UPLOAD_DIR, RISK_SUMMARY_DIR
 from utils.cleanup_empty_dirs import cleanup_empty_dirs
 
 
-async def upload_document(file, project_id, user_id, folder_name, file_type, file_name):
+async def upload_document(
+    file, project_id, user_id, folder_name, file_type, file_name, background_tasks
+):
 
     async with AsyncSessionLocal() as session:
         existing = await get_contract_path(session, project_id)
@@ -29,6 +33,7 @@ async def upload_document(file, project_id, user_id, folder_name, file_type, fil
     # ✅ reuse folder if exists
     if not folder and not folder_name and file_type == "config":
         folder_path = base_path
+        os.makedirs(folder_path, exist_ok=True)
         print("Global config file")
     else:
         if folder:
@@ -48,15 +53,21 @@ async def upload_document(file, project_id, user_id, folder_name, file_type, fil
         f.write(content)
 
     # DB save
+    document_id = None
     if file_type == "config":
-        await add_config_path(
+        document_id = await add_config_path(
             user_id, project_id, folder_name, file.filename, file_path
         )
     elif file_type == "contract":
-        await add_contract_path(
+        document_id = await add_contract_path(
             user_id, project_id, folder_name, file.filename, file_path
         )
-    # await embed_and_store_chunks(contract)
+
+        background_tasks.add_task(
+            embed_and_store_chunks, user_id, project_id, document_id["id"], file_path
+        )
+
+    return document_id
 
 
 async def delete_document(user_id, project_id, doc_id, doc_type):
@@ -67,7 +78,7 @@ async def delete_document(user_id, project_id, doc_id, doc_type):
             await delete_config_path(session, doc_id)
             file_path = result["config_path"]
         elif doc_type == "contract":
-            result = await get_contract_path_by_doc_id_dao(session, doc_id)
+            result = await get_contract_by_doc_id_dao(session, doc_id)
             await delete_contract_path(session, doc_id)
             file_path = result["contract_path"]
         elif doc_type == "risk-assessment":

@@ -1,15 +1,15 @@
 import os
 import json
-import pdfplumber
-import asyncio
 from datetime import datetime
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
 
 from db.connection import AsyncSessionLocal
 from dao.project_dao import get_project_details_dao
-from dao.contract_path_dao import get_contract_path_dao
-from dao.config_path_dao import get_config_path_dao
+from dao.contract_dao import get_contract_dao
+from dao.config_dao import get_config_path_dao
 from services.risk_summary_service import add_risk_summary_path
+from services.embedding_and_chunks_service import embed_and_store_chunks
 from ai_models.generate_summary import generate_summary
 from utils.config_reader import read_config_file
 from config.constants import RISK_SUMMARY_DIR
@@ -17,11 +17,11 @@ from utils.helper import extract_text
 from config.constants import MODEL_TO_BE_USED
 
 
-async def run_assessment_and_generate_summary(user_id, project_id):
+async def run_assessment_and_generate_summary(user_id, project_id, background_tasks):
     # Step 1 — fetch all data
     async with AsyncSessionLocal() as session:
         project = await get_project_details_dao(session, project_id, user_id)
-        contracts = await get_contract_path_dao(session, project_id)
+        contracts = await get_contract_dao(session, project_id)
         configs = await get_config_path_dao(session, project_id)
 
     if not project:
@@ -31,6 +31,38 @@ async def run_assessment_and_generate_summary(user_id, project_id):
             status_code=404, detail="No contracts found for this project"
         )
 
+    # Guard 1 — still in flight
+    print(contracts, "contractssssssss")
+    if any(c["embedding_status"] == "processing" for c in contracts):
+        print("embedding is in progress")
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status_code": 202,
+                "detail": "Documents are still being processed. Please try again in a moment.",
+            },
+        )
+
+    # Guard 2 — some failed, retry them
+    if any(c["embedding_status"] in ("failed", "pending") for c in contracts):
+        for contract in contracts:
+            if contract["embedding_status"] in ("failed", "pending"):
+                background_tasks.add_task(
+                    embed_and_store_chunks,
+                    user_id,
+                    project_id,
+                    contract["id"],
+                    contract["contract_path"],
+                )
+        return JSONResponse(
+            status_code=202,
+            content={
+                "status_code": 202,
+                "detail": "Some documents failed/not started and are being retried/started. Please try again in a moment.",
+            },
+        )
+
+    # All completed — fall through to assessment
     # Step 2 — organize configs by folder
     # global config has folder_name = ""
     global_config_path = None
@@ -49,60 +81,59 @@ async def run_assessment_and_generate_summary(user_id, project_id):
         folder = (contract["folder_name"] or "").strip()
         folder_contracts_map.setdefault(folder, []).append(contract)
 
-    # Step 4 — build combined text per folder, each with its correct config
+    # ADD this import at the top
+    from services.rag_service import retrieve_context_for_config
+
+    # Step 4 — retrieve relevant chunks per folder using RAG
     all_folder_assessments = []
 
     for folder_name, folder_contracts in folder_contracts_map.items():
-        # pick config: folder-level first, fallback to global, fallback to None
         config_path = folder_config_map.get(folder_name) or global_config_path
-        config_rows = read_config_file(config_path)  # [] if no config
+        config_rows = read_config_file(config_path)
 
-        # extract and combine text from all contracts in this folder
-        folder_text_parts = []
-        for contract in folder_contracts:
-            path = contract["contract_path"]
-            if not path or not os.path.exists(path):
-                print(f"Warning: contract file missing: {path}")
-                continue
-            text = extract_text(path)
-            if text.strip():
-                folder_text_parts.append(
-                    f"--- Contract: {contract['contract_name']} ---\n{text}"
-                )
+        # Get the contract_ids for this folder
+        folder_contract_ids = [c["id"] for c in folder_contracts]
 
-        if not folder_text_parts:
-            continue
+        # RAG: retrieve relevant chunks instead of full text
+        # We pass project_id — the DAO already filters by project
+        retrieved_context = await retrieve_context_for_config(
+            project_id=project_id,
+            config_rows=config_rows,
+        )
 
-        combined_text = "\n\n".join(folder_text_parts)
+        if not retrieved_context.strip():
+            # Fallback: if RAG returns nothing, use full text (old behavior)
+            print(
+                f"Warning: RAG returned no chunks for folder {folder_name}, falling back to full text"
+            )
+            folder_text_parts = []
+            for contract in folder_contracts:
+                path = contract["contract_path"]
+                if path and os.path.exists(path):
+                    text = extract_text(path)
+                    if text.strip():
+                        folder_text_parts.append(text)
+            retrieved_context = "\n\n".join(folder_text_parts)[:12000]
+
         folder_label = folder_name if folder_name else "Root"
-
         all_folder_assessments.append(
             {
                 "folder": folder_label,
-                "text": combined_text,
+                "text": retrieved_context,  # ← chunks, not full text
                 "config_rows": config_rows,
                 "config_used": os.path.basename(config_path) if config_path else None,
             }
         )
 
-    if not all_folder_assessments:
-        raise HTTPException(
-            status_code=422, detail="Could not extract text from any contract"
-        )
-
-    # Step 5 — run AI assessment
-    # combine all folder texts into one project-level assessment
+    # Step 5 — run AI assessment (unchanged)
     full_text = "\n\n".join(
         f"=== {fa['folder']} ===\n{fa['text']}" for fa in all_folder_assessments
     )
-    # use the config from the first folder that has one, else global
-    # (for project-level summary we pass the most relevant config)
     primary_config = next(
         (fa["config_rows"] for fa in all_folder_assessments if fa["config_rows"]), []
     )
 
     summary = await generate_summary(full_text, primary_config, MODEL_TO_BE_USED)
-
     # Step 6 — attach metadata about which config was used per folder
     summary["meta"]["folder_config_mapping"] = [
         {

@@ -4,8 +4,9 @@ from dao.project_dao import (
     delete_project_dao,
     get_project_details_dao,
     get_all_projects_dao,
+    get_recent_projects_dao,
 )
-from dao.risk_summary_path_dao import get_risk_summary_path_dao
+from dao.risk_summary_dao import get_risk_summary_path_dao
 from services.contract_service import get_contract_path
 from services.config_service import get_config_path
 from services.risk_summary_service import get_risk_summary_path
@@ -13,6 +14,7 @@ import os
 import shutil
 import json
 from utils.generate_pdf_from_json import generate_pdf_from_json
+from utils.generate_docx_from_json import generate_docx_from_json
 from utils.folder_structure import build_folder_structure
 from fastapi.responses import FileResponse
 from fastapi import HTTPException
@@ -121,3 +123,9 @@ async def download_risk_summary(user_id, project_id, file_type):
             "Content-Disposition": f"attachment; filename=risk_summary.{file_type}"
         },
     )
+
+
+async def get_recent_projects(user_id):
+    async with AsyncSessionLocal() as session:
+        projects = await get_recent_projects_dao(session, user_id)
+        return projects

@@ -32,7 +32,7 @@ You are a legal and risk assessment analyst. Analyze the following contract docu
 {assessment_instruction}
 
 Contract Documents:
-{contracts_text[:12000]}
+{contracts_text}
 
 Respond in this exact JSON format with no extra text, no markdown, no backticks:
 {{

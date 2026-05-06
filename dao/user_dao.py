@@ -14,13 +14,13 @@ async def get_user_by_id(session, user_id):
 
 
 async def create_user_db(session, data, hashed_password):
-    query = text("""
+    insert_query = text("""
         INSERT INTO users (user_name, user_email, user_password)
         VALUES (:name, :email, :password)
     """)
 
     await session.execute(
-        query,
+        insert_query,
         {"name": data.user_name, "email": data.user_email, "password": hashed_password},
     )
 

@@ -1,5 +1,5 @@
 from db.connection import AsyncSessionLocal
-from dao.config_path_dao import (
+from dao.config_dao import (
     add_config_path_dao,
     get_config_path_dao,
     get_config_path_by_doc_id_dao,
@@ -9,11 +9,11 @@ from dao.config_path_dao import (
 
 async def add_config_path(user_id, project_id, folder_name, file_name, file_path):
     async with AsyncSessionLocal() as session:
-        config_path = await add_config_path_dao(
+        config = await add_config_path_dao(
             session, user_id, project_id, folder_name, file_name, file_path
         )
         await session.commit()
-        return config_path
+        return config
 
 
 async def get_config_path(session, project_id):

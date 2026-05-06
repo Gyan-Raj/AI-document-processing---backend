@@ -14,9 +14,12 @@ PROVIDER_MAP = {
     "gemini": gemini_generate,
 }
 
+
 async def generate_summary(text: str, config_rows: list, model_key: str) -> dict:
     if model_key not in AI_MODELS:
-        raise ValueError(f"Unsupported model: {model_key}. Available: {list(AI_MODELS.keys())}")
+        raise ValueError(
+            f"Unsupported model: {model_key}. Available: {list(AI_MODELS.keys())}"
+        )
 
     config = AI_MODELS[model_key]
     provider = config["provider"]
@@ -46,8 +49,8 @@ async def generate_summary(text: str, config_rows: list, model_key: str) -> dict
             "meta": {
                 "provider": provider,
                 "model": config["model"],
-                "generated_by": "Gyan Raj"
-            }
+                "generated_by": "Gyan Raj",
+            },
         }
     except json.JSONDecodeError as e:
         raise ValueError(f"AI returned invalid JSON: {e}\nRaw: {raw_output}")

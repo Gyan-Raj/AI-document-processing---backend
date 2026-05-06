@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 async def get_me(request):
     userId = request.state.user_id  # ✅ already validated by middleware, just read it
-
+    print(userId, "userIdddddddd")
     async with AsyncSessionLocal() as session:
         userInfo = await get_user_by_id(session, userId)
 

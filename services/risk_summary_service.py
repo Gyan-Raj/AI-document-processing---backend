@@ -1,5 +1,5 @@
 from db.connection import AsyncSessionLocal
-from dao.risk_summary_path_dao import (
+from dao.risk_summary_dao import (
     add_risk_summary_path_dao,
     get_risk_summary_path_dao,
 )

@@ -5,6 +5,7 @@ from services.project_service import (
     get_project_details,
     get_all_projects,
     download_risk_summary,
+    get_recent_projects,
 )
 from schemas.project_schema import CreateProjectRequest
 
@@ -14,7 +15,7 @@ project_router = APIRouter()
 @project_router.post("/create-project")
 async def create_project_route(request: Request, data: CreateProjectRequest):
     print(data, "data")
-    projectName = data.projectName
+    projectName = data.project_name
     project = await create_project(projectName, request.state.user_id)
     print(project, "project")
     return {"message": "Project created successfully", "project": project}
@@ -45,3 +46,9 @@ async def download_risk_summary_route(
     request: Request, id: int, type: str = Query("pdf")
 ):
     return await download_risk_summary(request.state.user_id, id, type)
+
+
+@project_router.get("/recent-projects")
+async def get_all_projects_route(request: Request):
+    projects = await get_recent_projects(request.state.user_id)
+    return {"message": "Projects fetched successfully", "projects": projects}

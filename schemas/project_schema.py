@@ -1,4 +1,5 @@
 from pydantic import BaseModel
 
+
 class CreateProjectRequest(BaseModel):
-    projectName: str
+    project_name: str

@@ -55,3 +55,16 @@ async def get_all_projects_dao(session, user_id, query: str = ""):
 
     result = await session.execute(select_query, params)
     return result.mappings().all()
+
+
+async def get_recent_projects_dao(session, user_id):
+    select_query = text("""
+        SELECT * FROM projects
+        WHERE user_id = :user_id
+        ORDER BY created_at DESC
+        LIMIT 10 OFFSET 0
+    """)
+    params = {"user_id": user_id}
+
+    result = await session.execute(select_query, params)
+    return result.mappings().all()

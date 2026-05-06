@@ -7,8 +7,9 @@ async def add_config_path_dao(
     insert_query = text("""
         INSERT INTO configs (user_id, project_id, config_path, config_name, folder_name) 
         VALUES (:user_id, :project_id, :file_path, :file_name, :folder_name)
+        RETURNING id, user_id, project_id, config_path, config_name, folder_name
     """)
-    await session.execute(
+    result = await session.execute(
         insert_query,
         {
             "user_id": user_id,
@@ -18,6 +19,8 @@ async def add_config_path_dao(
             "folder_name": folder_name,
         },
     )
+    config_row = result.mappings().one()
+    return config_row
 
 
 async def get_config_path_dao(session, project_id):

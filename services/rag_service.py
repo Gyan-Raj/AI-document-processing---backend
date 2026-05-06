@@ -1,12 +1,11 @@
 import asyncio
-from sentence_transformers import SentenceTransformer
 from db.connection import AsyncSessionLocal
 from dao.chunks_dao import search_similar_chunks_dao
-
-model = SentenceTransformer("all-MiniLM-L6-v2")
+from ai_models.model import get_model
 
 
 def embed_query(text: str) -> list[float]:
+    model = get_model()
     return model.encode([text])[0].tolist()
 
 

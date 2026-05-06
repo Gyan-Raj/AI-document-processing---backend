@@ -6,10 +6,10 @@ from db.connection import AsyncSessionLocal  # your existing DB setup
 from utils.helper import extract_text  # reuse what you already have
 from dao.embedding_and_chunks_dao import store_chunks_dao
 from dao.contract_dao import update_contract_embedding_status_dao
+from ai_models.model import get_model
 
 # Load model once at module level — not inside the function
 # This is important: loading takes ~2 seconds, you don't want it per request
-model = SentenceTransformer("all-MiniLM-L6-v2")
 
 CHUNK_SIZE = 500
 # CHUNK_SIZE = 300
@@ -32,8 +32,8 @@ def chunk_text(
 
 def embed_chunks(chunks: list[str]) -> list[list[float]]:
     """Embed a list of text chunks. Returns list of 384-dim vectors."""
-    embeddings = model.encode(chunks, show_progress_bar=False)
-    return embeddings.tolist()
+    model = get_model()  # loads on first call, cached after
+    return model.encode(chunks, show_progress_bar=False).tolist()
 
 
 async def embed_and_store_chunks(

@@ -22,4 +22,4 @@ pdfplumber
 openpyxl
 pydantic
 reportlab
-docx
+python-docx

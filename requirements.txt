@@ -21,3 +21,4 @@ numpy
 pdfplumber
 openpyxl
 pydantic
+reportlab

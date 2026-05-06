@@ -1,7 +1,6 @@
 # services/embedding_service.py
 
 import asyncio
-from sentence_transformers import SentenceTransformer
 from db.connection import AsyncSessionLocal  # your existing DB setup
 from utils.helper import extract_text  # reuse what you already have
 from dao.embedding_and_chunks_dao import store_chunks_dao

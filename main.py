@@ -1,3 +1,5 @@
+import os
+
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,7 +26,9 @@ app = FastAPI(lifespan=lifespan)  # replaces deprecated @app.on_event("startup")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4000"],
+    allow_origins=[
+        origin.strip() for origin in os.getenv("FRONTEND_ORIGIN", "").split(",")
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -14,9 +14,7 @@ openai
 anthropic
 google-genai
 groq
-sentence-transformers
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch
 numpy
 pdfplumber
 openpyxl

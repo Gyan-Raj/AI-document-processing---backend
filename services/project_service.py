@@ -27,6 +27,8 @@ async def create_project(projectName, user_id):
     async with AsyncSessionLocal() as session:
         project = await create_project_dao(session, projectName, user_id)
         await session.commit()
+        project_folder = f"{UPLOAD_DIR}/{user_id}/{project.id}"
+        os.makedirs(project_folder, exist_ok=True)
         return project
 
 

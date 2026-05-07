@@ -1,15 +1,11 @@
 import jwt
 from datetime import datetime, timedelta
-import os
 import bcrypt
 import hashlib
 from fastapi import HTTPException
-import pdfplumber
+from config.env_constants import ACCESS_SECRET, REFRESH_SECRET
 
-ACCESS_SECRET = os.getenv("JWT_ACCESS_SECRET_KEY")
-REFRESH_SECRET = os.getenv("JWT_REFRESH_SECRET_KEY")
 ALGORITHM = "HS256"
-
 ACCESS_TOKEN = "ACCESS_TOKEN"
 REFRESH_TOKEN = "REFRESH_TOKEN"
 
@@ -55,14 +51,3 @@ def bcrypt_entity(entity: str) -> str:
 
 def verify_bcrypted_entity(entity: str, hashed_entity: str) -> bool:
     return bcrypt.checkpw(entity.encode(), hashed_entity.encode())
-
-
-def extract_text(pdf_path: str) -> str:
-    """Extract all text from a PDF, page by page."""
-    full_text = ""
-    with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
-            page_text = page.extract_text()
-            if page_text:  # some pages are images — skip them
-                full_text += page_text + "\n"
-    return full_text

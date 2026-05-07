@@ -2,10 +2,11 @@
 
 import asyncio
 from db.connection import AsyncSessionLocal  # your existing DB setup
-from utils.helper import extract_text  # reuse what you already have
+from utils.embedding_and_chunk import extract_text  # reuse what you already have
 from dao.embedding_and_chunks_dao import store_chunks_dao
 from dao.contract_dao import update_contract_embedding_status_dao
-from ai_models.model import get_model
+from utils.embedding_and_chunk import embed_query, embed_chunks
+from dao.chunks_dao import search_similar_chunks_dao
 
 # Load model once at module level — not inside the function
 # This is important: loading takes ~2 seconds, you don't want it per request
@@ -29,12 +30,6 @@ def chunk_text(
     return chunks
 
 
-def embed_chunks(chunks: list[str]) -> list[list[float]]:
-    """Embed a list of text chunks. Returns list of 384-dim vectors."""
-    model = get_model()  # loads on first call, cached after
-    return model.encode(chunks, show_progress_bar=False).tolist()
-
-
 async def embed_and_store_chunks(
     user_id: int, project_id: int, contract_id: int, contract_path: str
 ) -> int:
@@ -47,10 +42,9 @@ async def embed_and_store_chunks(
         async with AsyncSessionLocal() as session:
             print("changed to processing")
 
-            result = await update_contract_embedding_status_dao(
+            await update_contract_embedding_status_dao(
                 session, user_id, project_id, contract_id, "processing"
             )
-            print(result, "resultttttttttt")
 
         # Step 1 — extract text (reusing your existing function)
         text = extract_text(contract_path)
@@ -86,3 +80,39 @@ async def embed_and_store_chunks(
             await update_contract_embedding_status_dao(
                 session, user_id, project_id, contract_id, "failed"
             )
+
+
+async def retrieve_context_for_config(
+    project_id: int, config_rows: list, top_k: int = 1, threshold: float = 0.3
+) -> str:
+    sections = []
+
+    for row in config_rows:
+        if str(row.get("Enabled", "Yes")).strip().lower() != "yes":
+            continue
+
+        query = (row.get("Keywords") or row.get("Subject") or "").strip()
+        if not query:
+            continue
+
+        query_embedding = await asyncio.get_event_loop().run_in_executor(
+            None, embed_query, query
+        )
+
+        async with AsyncSessionLocal() as session:
+            chunks = await search_similar_chunks_dao(
+                session, query_embedding, project_id, top_k=top_k, threshold=threshold
+            )
+
+        # debug — remove after tuning
+        print(f"\n--- Query: {query} ---")
+        for c in chunks:
+            print(f"  similarity: {c['similarity']} | chunk: {c['text'][:150]}")
+
+        if not chunks:
+            continue
+
+        chunk_texts = "\n---\n".join(c["text"] for c in chunks)
+        sections.append(f"[Subject: {row['Subject']}]\n{chunk_texts}")
+
+    return "\n\n===\n\n".join(sections)

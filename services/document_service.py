@@ -33,7 +33,7 @@ async def upload_document(
     # ✅ reuse folder if exists
     if not folder and not folder_name and file_type == "config":
         folder_path = base_path
-        os.makedirs(folder_path, exist_ok=True)
+        # os.makedirs(folder_path, exist_ok=True)
         print("Global config file")
     else:
         if folder:

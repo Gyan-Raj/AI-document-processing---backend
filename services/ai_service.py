@@ -13,8 +13,8 @@ from services.embedding_and_chunks_service import embed_and_store_chunks
 from ai_models.generate_summary import generate_summary
 from utils.config_reader import read_config_file
 from config.constants import RISK_SUMMARY_DIR
-from utils.helper import extract_text
-from config.constants import MODEL_TO_BE_USED
+from utils.embedding_and_chunk import extract_text
+from config.env_constants import MODEL_TO_BE_USED
 
 
 async def run_assessment_and_generate_summary(user_id, project_id, background_tasks):
@@ -32,7 +32,6 @@ async def run_assessment_and_generate_summary(user_id, project_id, background_ta
         )
 
     # Guard 1 — still in flight
-    print(contracts, "contractssssssss")
     if any(c["embedding_status"] == "processing" for c in contracts):
         print("embedding is in progress")
         return JSONResponse(
@@ -82,7 +81,7 @@ async def run_assessment_and_generate_summary(user_id, project_id, background_ta
         folder_contracts_map.setdefault(folder, []).append(contract)
 
     # ADD this import at the top
-    from services.rag_service import retrieve_context_for_config
+    from services.embedding_and_chunks_service import retrieve_context_for_config
 
     # Step 4 — retrieve relevant chunks per folder using RAG
     all_folder_assessments = []

@@ -1,11 +1,6 @@
-import os
-
-from dotenv import load_dotenv
-
-load_dotenv()
-
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from config.env_constants import FRONTEND_ORIGINS
 from routes.auth import auth_router
 
 # from routes.user import router as user_router
@@ -24,11 +19,10 @@ async def lifespan(app):
 
 app = FastAPI(lifespan=lifespan)  # replaces deprecated @app.on_event("startup")
 
+print(FRONTEND_ORIGINS, "FRONTEND_ORIGINS")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        origin.strip() for origin in os.getenv("FRONTEND_ORIGIN", "").split(",")
-    ],
+    allow_origins=[origin.strip() for origin in FRONTEND_ORIGINS.split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -33,7 +33,6 @@ async def upload_document(
     # ✅ reuse folder if exists
     if not folder and not folder_name and file_type == "config":
         folder_path = base_path
-        # os.makedirs(folder_path, exist_ok=True)
         print("Global config file")
     else:
         if folder:
@@ -72,19 +71,23 @@ async def upload_document(
 
 async def delete_document(user_id, project_id, doc_id, doc_type):
     # DB operations
+    folder_name = None
     async with AsyncSessionLocal() as session:
         if doc_type == "config":
             result = await get_config_path_by_doc_id_dao(session, doc_id)
             await delete_config_path(session, doc_id)
             file_path = result["config_path"]
+            folder_name = result["folder_name"]
         elif doc_type == "contract":
             result = await get_contract_by_doc_id_dao(session, doc_id)
             await delete_contract_path(session, doc_id)
             file_path = result["contract_path"]
+            folder_name = result["folder_name"]
         elif doc_type == "risk-assessment":
             result = await get_risk_summary_path_by_doc_id_dao(session, doc_id)
             await delete_contract_path(session, doc_id)
             file_path = result["risk_summary_path"]
+            folder_name = result["folder_name"]
         else:
             raise HTTPException(status_code=400, detail="Invalid doc type")
         await session.commit()
@@ -95,10 +98,12 @@ async def delete_document(user_id, project_id, doc_id, doc_type):
             os.remove(file_path)
         except Exception as e:
             print(f"File delete failed: {e}")
-
     # Cleanup folders safely
     if doc_type == "config" or doc_type == "contract":
-        project_root = f"{UPLOAD_DIR}/{user_id}/{project_id}"
+        if not folder_name:
+            project_root = f"{UPLOAD_DIR}/{user_id}/{project_id}/"
+        else:
+            project_root = f"{UPLOAD_DIR}/{user_id}/{project_id}"
     elif doc_type == "risk-assessment":
         project_root = f"{RISK_SUMMARY_DIR}/{user_id}/{project_id}"
     start_folder = os.path.dirname(file_path)

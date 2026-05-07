@@ -9,12 +9,28 @@ from config.constants import ACCESS_TOKEN_COOKIE_OPTIONS, REFRESH_TOKEN_COOKIE_O
 @auth_router.post("/signup")
 async def signup(data: SignupRequest):
     print("Sign up requested")
+    user_email = data.user_email.strip()
+    user_name = data.user_name.strip()
+    user_password = data.user_password.strip()
+    if not user_email or not user_name or not user_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Please fill in required fields",
+        )
     return await create_user(data)
 
 
 @auth_router.post("/login")
 async def login(data: LoginRequest, response: Response):
     print("Log in requested")
+    user_email = data.user_email.strip()
+    user_password = data.user_password.strip()
+
+    if not user_email or not user_password:
+        raise HTTPException(
+            status_code=400,
+            detail="Please fill in required fields",
+        )
 
     tokens = await login_user(data)
 

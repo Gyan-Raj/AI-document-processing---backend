@@ -12,32 +12,30 @@ async def store_chunks_dao(
     chunks: list[str],
     embeddings: list[list[float]],
 ) -> None:
-    """Insert all chunks for a contract in one transaction."""
-
-    # Delete existing chunks for this contract first
-    # Important: if someone re-uploads a contract, you don't want duplicates
     await session.execute(
         text("DELETE FROM chunks WHERE contract_id = :contract_id"),
         {"contract_id": contract_id},
     )
 
-    for i, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-        await session.execute(
-            text("""
-                INSERT INTO chunks (user_id, project_id, contract_id, chunk_index, chunk_text, embedding)
-                VALUES (:user_id, :project_id, :contract_id, :chunk_index, :chunk_text, :embedding)
-            """),
-            {
-                "user_id": user_id,
-                "project_id": project_id,
-                "contract_id": contract_id,
-                "chunk_index": i,
-                "chunk_text": chunk,
-                "embedding": str(
-                    embedding
-                ),  # pgvector accepts '[0.1, 0.2, ...]' string format
-            },
-        )
+    rows = [
+        {
+            "user_id": user_id,
+            "project_id": project_id,
+            "contract_id": contract_id,
+            "chunk_index": i,
+            "chunk_text": chunk,
+            "embedding": str(embedding),
+        }
+        for i, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+    ]
+
+    await session.execute(
+        text("""
+            INSERT INTO chunks (user_id, project_id, contract_id, chunk_index, chunk_text, embedding)
+            VALUES (:user_id, :project_id, :contract_id, :chunk_index, :chunk_text, :embedding)
+        """),
+        rows,  # SQLAlchemy sends this as a single batch
+    )
 
     await session.commit()
 

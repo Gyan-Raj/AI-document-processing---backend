@@ -58,16 +58,13 @@ async def embed_and_store_chunks(
             return 0
 
         # Step 3 — embed (CPU-bound — run in executor so it doesn't block async event loop)
-        embeddings = await asyncio.get_event_loop().run_in_executor(
-            None, embed_chunks, chunks
-        )
+        embeddings = await embed_chunks(chunks)
 
         # Step 4 — store in DB
         async with AsyncSessionLocal() as session:
             await store_chunks_dao(
                 session, user_id, project_id, contract_id, chunks, embeddings
             )
-
         print(f"Stored {len(chunks)} chunks for contract_id={contract_id}")
         async with AsyncSessionLocal() as session:
             await update_contract_embedding_status_dao(
@@ -95,9 +92,7 @@ async def retrieve_context_for_config(
         if not query:
             continue
 
-        query_embedding = await asyncio.get_event_loop().run_in_executor(
-            None, embed_query, query
-        )
+        query_embedding = await embed_query(query)
 
         async with AsyncSessionLocal() as session:
             chunks = await search_similar_chunks_dao(
